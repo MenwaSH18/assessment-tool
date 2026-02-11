@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Take Assessment</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="nav-brand">Assessment Tool</a>
+    <span class="nav-label" id="navTitle">Loading...</span>
+  </nav>
+
+  <div class="container">
+    <!-- Student Name Entry -->
+    <section id="nameEntry" class="card centered-card">
+      <h2 id="assessmentHeading">Assessment</h2>
+      <p id="assessmentDesc"></p>
+      <p id="assessmentMeta" style="font-size:0.85rem;color:var(--text-light);margin-bottom:1rem;"></p>
+      <div class="form-group">
+        <label for="studentName">Your Name *</label>
+        <input type="text" id="studentName" placeholder="Enter your full name" required>
+      </div>
+      <button class="btn btn-primary btn-large" onclick="startAssessment()">Start Assessment</button>
+    </section>
+
+    <!-- Questions Section -->
+    <section id="questionsSection" style="display:none;">
+      <div class="progress-bar-container">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <p class="progress-text" id="progressText"></p>
+
+      <div id="questionsContainer"></div>
+
+      <div class="submit-section">
+        <button class="btn btn-primary btn-large" id="submitBtn" onclick="submitAssessment()">
+          Submit Assessment
+        </button>
+      </div>
+    </section>
+
+    <!-- Loading overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display:none;">
+      <div class="spinner"></div>
+      <p style="font-weight:600;font-size:1.1rem;">Evaluating your answers...</p>
+      <p class="loading-sub">AI is reviewing your open-ended responses. This may take a moment.</p>
+    </div>
+  </div>
+
+  <script src="/js/assessment.js"></script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Assessment Tool</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="nav-brand">Assessment Tool</a>
+    <span class="nav-label">Admin Panel</span>
+  </nav>
+
+  <div class="container">
+    <!-- Assessment List View -->
+    <section id="assessmentListView">
+      <div class="section-header">
+        <h2>Your Assessments</h2>
+        <button class="btn btn-primary" onclick="showCreateForm()">+ New Assessment</button>
+      </div>
+
+      <!-- Create/Edit Form -->
+      <div id="assessmentForm" class="card form-card" style="display:none;">
+        <h3 id="formTitle">Create New Assessment</h3>
+        <input type="hidden" id="editId">
+        <div class="form-group">
+          <label for="aTitle">Title *</label>
+          <input type="text" id="aTitle" placeholder="e.g., Chapter 5 Quiz" required>
+        </div>
+        <div class="form-group">
+          <label for="aSubject">Subject</label>
+          <input type="text" id="aSubject" placeholder="e.g., Mathematics">
+        </div>
+        <div class="form-group">
+          <label for="aDescription">Description</label>
+          <textarea id="aDescription" rows="3" placeholder="Brief description of this assessment..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="saveAssessment()">Save</button>
+          <button class="btn btn-ghost" onclick="hideCreateForm()">Cancel</button>
+        </div>
+      </div>
+
+      <div id="assessmentList" class="assessment-grid">
+        <p class="empty-state">Loading...</p>
+      </div>
+    </section>
+
+    <!-- Assessment Detail View -->
+    <section id="assessmentDetailView" style="display:none;">
+      <button class="btn btn-ghost back-btn" onclick="showListView()">&larr; Back to Assessments</button>
+      <div id="assessmentInfo" class="card"></div>
+
+      <div class="section-header">
+        <h3>Questions</h3>
+        <button class="btn btn-primary" onclick="showQuestionForm()">+ Add Question</button>
+      </div>
+
+      <!-- Question Form -->
+      <div id="questionForm" class="card form-card" style="display:none;">
+        <h4 id="qFormTitle">Add Question</h4>
+        <input type="hidden" id="qEditId">
+        <div class="form-group">
+          <label for="qType">Question Type</label>
+          <select id="qType" onchange="toggleQuestionType()">
+            <option value="mcq">Multiple Choice</option>
+            <option value="open">Open-Ended</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="qText">Question Text *</label>
+          <textarea id="qText" rows="3" required placeholder="Enter your question here..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="qPoints">Points</label>
+          <input type="number" id="qPoints" value="1" min="1" max="100">
+        </div>
+
+        <!-- MCQ fields -->
+        <div id="mcqFields">
+          <div class="form-group">
+            <label>Options</label>
+            <div class="option-row"><span>A.</span><input type="text" id="optA" placeholder="Option A"></div>
+            <div class="option-row"><span>B.</span><input type="text" id="optB" placeholder="Option B"></div>
+            <div class="option-row"><span>C.</span><input type="text" id="optC" placeholder="Option C"></div>
+            <div class="option-row"><span>D.</span><input type="text" id="optD" placeholder="Option D"></div>
+          </div>
+          <div class="form-group">
+            <label for="qCorrect">Correct Answer</label>
+            <select id="qCorrect">
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+              <option value="D">D</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Open-ended fields -->
+        <div id="openFields" style="display:none;">
+          <div class="form-group">
+            <label for="qExpected">Expected Answer / Key Points</label>
+            <textarea id="qExpected" rows="3" placeholder="The ideal answer or key points the student should cover..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="qRubric">Grading Rubric</label>
+            <textarea id="qRubric" rows="3" placeholder="How should this answer be evaluated? What criteria matter?"></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="saveQuestion()">Save Question</button>
+          <button class="btn btn-ghost" onclick="hideQuestionForm()">Cancel</button>
+        </div>
+      </div>
+
+      <div id="questionList"></div>
+
+      <!-- Submissions -->
+      <div class="section-header" style="margin-top:2rem;">
+        <h3>Student Submissions</h3>
+      </div>
+      <div id="submissionsList"></div>
+    </section>
+  </div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>

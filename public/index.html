@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assessment Tool</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="container landing">
+    <h1>Assessment Tool</h1>
+    <p class="subtitle">Create, share, and evaluate assessments with AI-powered grading</p>
+
+    <div class="card-group">
+      <div class="card">
+        <h2>For Teachers</h2>
+        <p>Create assessments, add multiple choice and open-ended questions, and view student results with AI-powered evaluation.</p>
+        <a href="/admin" class="btn btn-primary">Go to Admin Panel</a>
+      </div>
+
+      <div class="card">
+        <h2>For Students</h2>
+        <p>Enter the assessment code provided by your teacher to start your assessment.</p>
+        <form id="joinForm" class="inline-form">
+          <input type="text" id="shareCode" placeholder="Enter assessment code" required maxlength="8">
+          <button type="submit" class="btn btn-secondary">Start Assessment</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('joinForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const code = document.getElementById('shareCode').value.trim();
+      if (code) {
+        window.location.href = '/take/' + encodeURIComponent(code);
+      }
+    });
+  </script>
+</body>
+</html>
