@@ -1,0 +1,12 @@
+name = "assessment-tool"
+main = "src/worker.js"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "assessment-tool-db"
+database_id = "7f884fe3-71f1-4949-b902-427673fd4f17"
