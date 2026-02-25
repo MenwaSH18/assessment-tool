@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Assessment Results</title>
   <link rel="stylesheet" href="/css/style.css">
+  <!-- KaTeX for math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 </head>
 <body>
   <nav class="navbar">
@@ -17,11 +20,21 @@
       <div id="scoreSummary" class="card score-card">
         <p class="empty-state">Loading results...</p>
       </div>
+
+      <!-- AI Assessment Feedback -->
+      <div id="aiFeedbackSection" style="display:none;" class="card ai-feedback-card">
+        <h3>AI Assessment Summary</h3>
+        <p id="aiFeedbackSummary"></p>
+        <div id="aiFeedbackDetails"></div>
+      </div>
+
       <h3 style="margin-bottom:1rem;">Detailed Results</h3>
       <div id="answerBreakdown"></div>
     </div>
   </div>
 
+  <script src="/js/components/question-renderers.js"></script>
+  <script src="/js/lib/katex-render.js"></script>
   <script src="/js/results.js"></script>
 </body>
 </html>

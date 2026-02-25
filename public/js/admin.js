@@ -171,25 +171,13 @@ function renderQuestions(questions) {
     return;
   }
   const total = questions.length;
-  container.innerHTML = questions.map((q, i) => `
-    <div class="card question-card ${q.is_visible === 0 ? 'question-hidden' : ''}">
-      <div class="question-header">
-        <span class="question-num">Q${i + 1}</span>
-        <span class="badge ${q.type === 'mcq' ? 'badge-blue' : 'badge-green'}">
-          ${q.type === 'mcq' ? 'Multiple Choice' : 'Open-Ended'}
-        </span>
-        <span class="points-badge">${q.points} pt${q.points > 1 ? 's' : ''}</span>
-        ${q.is_visible === 0 ? '<span class="badge badge-hidden">Hidden</span>' : ''}
-        <div class="question-controls">
-          <button class="btn btn-sm reorder-btn" onclick="moveQuestion(${q.id}, 'up')" title="Move up" ${i === 0 ? 'disabled' : ''}>&#9650;</button>
-          <button class="btn btn-sm reorder-btn" onclick="moveQuestion(${q.id}, 'down')" title="Move down" ${i === total - 1 ? 'disabled' : ''}>&#9660;</button>
-          <button class="btn btn-sm btn-visibility" onclick="toggleVisibility(${q.id})" title="${q.is_visible === 0 ? 'Show question' : 'Hide question'}">
-            ${q.is_visible === 0 ? '&#128065;&#8288;&#8212;' : '&#128065;'}
-          </button>
-        </div>
-      </div>
-      <p class="question-text">${escapeHtml(q.question_text)}</p>
-      ${q.type === 'mcq' && q.options ? `
+  container.innerHTML = questions.map((q, i) => {
+    const badgeClass = (window.TYPE_BADGE_CLASSES && window.TYPE_BADGE_CLASSES[q.type]) || (q.type === 'mcq' ? 'badge-blue' : 'badge-green');
+    const typeLabel = (window.TYPE_LABELS && window.TYPE_LABELS[q.type]) || q.type;
+
+    let details = '';
+    if (q.type === 'mcq' && q.options) {
+      details = `
         <ul class="options-list">
           ${q.options.map((opt, idx) => `
             <li class="${['A','B','C','D'][idx] === q.correct_answer ? 'correct-option' : ''}">
@@ -197,17 +185,39 @@ function renderQuestions(questions) {
               ${['A','B','C','D'][idx] === q.correct_answer ? ' &#10003;' : ''}
             </li>
           `).join('')}
-        </ul>
-      ` : `
-        ${q.correct_answer ? `<p style="font-size:0.88rem;color:var(--text-muted);"><strong>Expected:</strong> ${escapeHtml(q.correct_answer)}</p>` : ''}
-        ${q.rubric ? `<p style="font-size:0.88rem;color:var(--text-muted);"><strong>Rubric:</strong> ${escapeHtml(q.rubric)}</p>` : ''}
-      `}
-      <div class="card-actions">
-        <button class="btn btn-sm btn-ghost" onclick="editQuestion(${q.id})">Edit</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteQuestion(${q.id})">Delete</button>
+        </ul>`;
+    } else if (q.type === 'tf') {
+      details = `<p style="font-size:0.88rem;color:var(--text-muted);"><strong>Correct Answer:</strong> ${q.correct_answer === 'true' ? 'True' : 'False'}</p>`;
+    } else {
+      details = '';
+      if (q.correct_answer) details += `<p style="font-size:0.88rem;color:var(--text-muted);"><strong>Expected:</strong> ${escapeHtml(q.correct_answer)}</p>`;
+      if (q.rubric) details += `<p style="font-size:0.88rem;color:var(--text-muted);"><strong>Rubric:</strong> ${escapeHtml(q.rubric)}</p>`;
+    }
+
+    return `
+      <div class="card question-card ${q.is_visible === 0 ? 'question-hidden' : ''}">
+        <div class="question-header">
+          <span class="question-num">Q${i + 1}</span>
+          <span class="badge ${badgeClass}">${typeLabel}</span>
+          <span class="points-badge">${q.points} pt${q.points > 1 ? 's' : ''}</span>
+          ${q.is_visible === 0 ? '<span class="badge badge-hidden">Hidden</span>' : ''}
+          <div class="question-controls">
+            <button class="btn btn-sm reorder-btn" onclick="moveQuestion(${q.id}, 'up')" title="Move up" ${i === 0 ? 'disabled' : ''}>&#9650;</button>
+            <button class="btn btn-sm reorder-btn" onclick="moveQuestion(${q.id}, 'down')" title="Move down" ${i === total - 1 ? 'disabled' : ''}>&#9660;</button>
+            <button class="btn btn-sm btn-visibility" onclick="toggleVisibility(${q.id})" title="${q.is_visible === 0 ? 'Show question' : 'Hide question'}">
+              ${q.is_visible === 0 ? '&#128065;&#8288;&#8212;' : '&#128065;'}
+            </button>
+          </div>
+        </div>
+        <p class="question-text">${escapeHtml(q.question_text)}</p>
+        ${details}
+        <div class="card-actions">
+          <button class="btn btn-sm btn-ghost" onclick="editQuestion(${q.id})">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteQuestion(${q.id})">Delete</button>
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 // ---- Visibility Toggle ----
@@ -239,18 +249,71 @@ async function moveQuestion(id, direction) {
   }
 }
 
+// ---- Question Type Toggle ----
+const TYPE_FIELD_MAP = {
+  mcq: 'mcqFields',
+  tf: 'tfFields',
+  open: 'openFields',
+  fill_blank: 'fillBlankFields',
+  code: 'codeFields',
+  math: 'mathFields',
+  diagram_label: 'diagramFields',
+};
+
+function toggleQuestionType() {
+  const type = document.getElementById('qType').value;
+  // Hide all type-specific fields
+  Object.values(TYPE_FIELD_MAP).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  // Show the relevant fields
+  const fieldId = TYPE_FIELD_MAP[type];
+  if (fieldId) {
+    const el = document.getElementById(fieldId);
+    if (el) el.style.display = 'block';
+  }
+}
+
 function showQuestionForm() {
   document.getElementById('qEditId').value = '';
   document.getElementById('qType').value = 'mcq';
   document.getElementById('qText').value = '';
   document.getElementById('qPoints').value = '1';
+  document.getElementById('qDifficulty').value = 'medium';
+  document.getElementById('qTopicTags').value = '';
+
+  // MCQ
   document.getElementById('optA').value = '';
   document.getElementById('optB').value = '';
   document.getElementById('optC').value = '';
   document.getElementById('optD').value = '';
   document.getElementById('qCorrect').value = 'A';
+  // TF
+  document.getElementById('qTFAnswer').value = 'true';
+  // Open
   document.getElementById('qExpected').value = '';
   document.getElementById('qRubric').value = '';
+  // Fill blank
+  document.getElementById('qFillTemplate').value = '';
+  document.getElementById('qFillAnswers').value = '';
+  // Code
+  document.getElementById('qCodeLang').value = 'python';
+  document.getElementById('qCodeTemplate').value = '';
+  document.getElementById('qCodeSolution').value = '';
+  document.getElementById('qTestCases').value = '';
+  document.getElementById('qCodeExpected').value = '';
+  document.getElementById('qCodeRubric').value = '';
+  // Math
+  document.getElementById('qMathLatex').value = '';
+  document.getElementById('qMathExpected').value = '';
+  document.getElementById('qMathRubric').value = '';
+  // Diagram
+  document.getElementById('qDiagramMermaid').value = '';
+  document.getElementById('qLabelRegions').value = '';
+  document.getElementById('qDiagramExpected').value = '';
+  document.getElementById('qDiagramRubric').value = '';
+
   document.getElementById('qFormTitle').textContent = 'Add Question';
   toggleQuestionType();
   document.getElementById('questionForm').style.display = 'block';
@@ -261,12 +324,6 @@ function hideQuestionForm() {
   document.getElementById('questionForm').style.display = 'none';
 }
 
-function toggleQuestionType() {
-  const type = document.getElementById('qType').value;
-  document.getElementById('mcqFields').style.display = type === 'mcq' ? 'block' : 'none';
-  document.getElementById('openFields').style.display = type === 'open' ? 'block' : 'none';
-}
-
 async function editQuestion(id) {
   try {
     const res = await fetch(API + '/assessments/' + currentAssessmentId);
@@ -274,20 +331,63 @@ async function editQuestion(id) {
     const q = data.questions.find(q => q.id === id);
     if (!q) return;
 
+    // Also fetch metadata
+    let metadata = null;
+    try {
+      const metaRes = await fetch(API + '/questions/assessment/' + currentAssessmentId);
+      const allQuestions = await metaRes.json();
+      const fullQ = allQuestions.find(fq => fq.id === id);
+      if (fullQ && fullQ.metadata) metadata = fullQ.metadata;
+    } catch { /* ignore */ }
+
     document.getElementById('qEditId').value = q.id;
     document.getElementById('qType').value = q.type;
     document.getElementById('qText').value = q.question_text;
     document.getElementById('qPoints').value = q.points || 1;
+    document.getElementById('qDifficulty').value = (metadata && metadata.difficulty) || 'medium';
+    document.getElementById('qTopicTags').value = (metadata && metadata.topic_tags) ? metadata.topic_tags.join(', ') : '';
 
-    if (q.type === 'mcq' && q.options) {
-      document.getElementById('optA').value = q.options[0] || '';
-      document.getElementById('optB').value = q.options[1] || '';
-      document.getElementById('optC').value = q.options[2] || '';
-      document.getElementById('optD').value = q.options[3] || '';
-      document.getElementById('qCorrect').value = q.correct_answer || 'A';
-    } else {
-      document.getElementById('qExpected').value = q.correct_answer || '';
-      document.getElementById('qRubric').value = q.rubric || '';
+    // Populate type-specific fields
+    switch (q.type) {
+      case 'mcq':
+        if (q.options) {
+          document.getElementById('optA').value = q.options[0] || '';
+          document.getElementById('optB').value = q.options[1] || '';
+          document.getElementById('optC').value = q.options[2] || '';
+          document.getElementById('optD').value = q.options[3] || '';
+        }
+        document.getElementById('qCorrect').value = q.correct_answer || 'A';
+        break;
+      case 'tf':
+        document.getElementById('qTFAnswer').value = q.correct_answer || 'true';
+        break;
+      case 'open':
+        document.getElementById('qExpected').value = q.correct_answer || '';
+        document.getElementById('qRubric').value = q.rubric || '';
+        break;
+      case 'fill_blank':
+        document.getElementById('qFillTemplate').value = (metadata && metadata.fill_blank_template) || '';
+        document.getElementById('qFillAnswers').value = (metadata && metadata.fill_blank_answers) ? metadata.fill_blank_answers.join(', ') : (q.correct_answer || '');
+        break;
+      case 'code':
+        document.getElementById('qCodeLang').value = (metadata && metadata.code_language) || 'python';
+        document.getElementById('qCodeTemplate').value = (metadata && metadata.code_template) || '';
+        document.getElementById('qCodeSolution').value = (metadata && metadata.code_solution) || '';
+        document.getElementById('qTestCases').value = (metadata && metadata.test_cases) ? JSON.stringify(metadata.test_cases, null, 2) : '';
+        document.getElementById('qCodeExpected').value = q.correct_answer || '';
+        document.getElementById('qCodeRubric').value = q.rubric || '';
+        break;
+      case 'math':
+        document.getElementById('qMathLatex').value = (metadata && metadata.math_latex) || '';
+        document.getElementById('qMathExpected').value = q.correct_answer || '';
+        document.getElementById('qMathRubric').value = q.rubric || '';
+        break;
+      case 'diagram_label':
+        document.getElementById('qDiagramMermaid').value = (metadata && metadata.diagram_mermaid) || '';
+        document.getElementById('qLabelRegions').value = (metadata && metadata.label_regions) ? JSON.stringify(metadata.label_regions, null, 2) : '';
+        document.getElementById('qDiagramExpected').value = q.correct_answer || '';
+        document.getElementById('qDiagramRubric').value = q.rubric || '';
+        break;
     }
 
     document.getElementById('qFormTitle').textContent = 'Edit Question';
@@ -311,22 +411,72 @@ async function saveQuestion() {
     type,
     question_text: questionText,
     points: parseInt(document.getElementById('qPoints').value) || 1,
+    metadata: {
+      difficulty: document.getElementById('qDifficulty').value,
+      topic_tags: document.getElementById('qTopicTags').value.split(',').map(t => t.trim()).filter(Boolean),
+    },
   };
 
-  if (type === 'mcq') {
-    const optA = document.getElementById('optA').value.trim();
-    const optB = document.getElementById('optB').value.trim();
-    const optC = document.getElementById('optC').value.trim();
-    const optD = document.getElementById('optD').value.trim();
-    if (!optA || !optB || !optC || !optD) {
-      alert('All 4 MCQ options are required');
-      return;
+  switch (type) {
+    case 'mcq': {
+      const optA = document.getElementById('optA').value.trim();
+      const optB = document.getElementById('optB').value.trim();
+      const optC = document.getElementById('optC').value.trim();
+      const optD = document.getElementById('optD').value.trim();
+      if (!optA || !optB || !optC || !optD) {
+        alert('All 4 MCQ options are required');
+        return;
+      }
+      body.options = [optA, optB, optC, optD];
+      body.correct_answer = document.getElementById('qCorrect').value;
+      break;
     }
-    body.options = [optA, optB, optC, optD];
-    body.correct_answer = document.getElementById('qCorrect').value;
-  } else {
-    body.correct_answer = document.getElementById('qExpected').value.trim();
-    body.rubric = document.getElementById('qRubric').value.trim();
+    case 'tf':
+      body.correct_answer = document.getElementById('qTFAnswer').value;
+      break;
+    case 'open':
+      body.correct_answer = document.getElementById('qExpected').value.trim();
+      body.rubric = document.getElementById('qRubric').value.trim();
+      break;
+    case 'fill_blank': {
+      const fillAnswersStr = document.getElementById('qFillAnswers').value.trim();
+      const fillAnswers = fillAnswersStr.split(',').map(a => a.trim()).filter(Boolean);
+      body.correct_answer = fillAnswers[0] || '';
+      body.metadata.fill_blank_template = document.getElementById('qFillTemplate').value.trim();
+      body.metadata.fill_blank_answers = fillAnswers;
+      break;
+    }
+    case 'code':
+      body.correct_answer = document.getElementById('qCodeExpected').value.trim();
+      body.rubric = document.getElementById('qCodeRubric').value.trim();
+      body.metadata.code_language = document.getElementById('qCodeLang').value;
+      body.metadata.code_template = document.getElementById('qCodeTemplate').value;
+      body.metadata.code_solution = document.getElementById('qCodeSolution').value;
+      try {
+        const tc = document.getElementById('qTestCases').value.trim();
+        body.metadata.test_cases = tc ? JSON.parse(tc) : [];
+      } catch {
+        alert('Test cases must be valid JSON');
+        return;
+      }
+      break;
+    case 'math':
+      body.correct_answer = document.getElementById('qMathExpected').value.trim();
+      body.rubric = document.getElementById('qMathRubric').value.trim();
+      body.metadata.math_latex = document.getElementById('qMathLatex').value.trim();
+      break;
+    case 'diagram_label':
+      body.correct_answer = document.getElementById('qDiagramExpected').value.trim();
+      body.rubric = document.getElementById('qDiagramRubric').value.trim();
+      body.metadata.diagram_mermaid = document.getElementById('qDiagramMermaid').value;
+      try {
+        const lr = document.getElementById('qLabelRegions').value.trim();
+        body.metadata.label_regions = lr ? JSON.parse(lr) : [];
+      } catch {
+        alert('Label regions must be valid JSON');
+        return;
+      }
+      break;
   }
 
   try {

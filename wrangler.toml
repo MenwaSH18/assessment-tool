@@ -5,8 +5,33 @@ compatibility_flags = ["nodejs_compat"]
 
 [assets]
 directory = "./public"
+binding = "ASSETS"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "assessment-tool-db"
 database_id = "7f884fe3-71f1-4949-b902-427673fd4f17"
+
+# Phase 2: File storage for uploaded resources (PDF, DOCX)
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "assessment-resources"
+
+# Phase 2: Vector embeddings for RAG search
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "content-embeddings"
+
+# Phase 2: Workers AI for embeddings and document parsing
+[ai]
+binding = "AI"
+
+# Phase 2: Async queue for document processing
+[[queues.producers]]
+binding = "QUEUE"
+queue = "resource-processing"
+
+[[queues.consumers]]
+queue = "resource-processing"
+max_batch_size = 5
+max_batch_timeout = 30

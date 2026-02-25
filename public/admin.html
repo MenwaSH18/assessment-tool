@@ -5,11 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Panel - Assessment Tool</title>
   <link rel="stylesheet" href="/css/style.css">
+  <!-- KaTeX for math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <!-- Mermaid for diagrams -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 </head>
 <body>
   <nav class="navbar">
     <a href="/" class="nav-brand">Assessment Tool</a>
-    <span class="nav-label">Admin Panel</span>
+    <div class="nav-links">
+      <a href="/content">Content & AI</a>
+      <span class="nav-label">Admin Panel</span>
+    </div>
   </nav>
 
   <div class="container">
@@ -30,7 +38,7 @@
         </div>
         <div class="form-group">
           <label for="aSubject">Subject</label>
-          <input type="text" id="aSubject" placeholder="e.g., Mathematics">
+          <input type="text" id="aSubject" placeholder="e.g., Computer Science">
         </div>
         <div class="form-group">
           <label for="aDescription">Description</label>
@@ -54,7 +62,10 @@
 
       <div class="section-header">
         <h3>Questions</h3>
-        <button class="btn btn-primary" onclick="showQuestionForm()">+ Add Question</button>
+        <div style="display:flex;gap:0.5rem;">
+          <a href="/content" class="btn btn-ai btn-sm">🤖 AI Generate</a>
+          <button class="btn btn-primary" onclick="showQuestionForm()">+ Add Question</button>
+        </div>
       </div>
 
       <!-- Question Form -->
@@ -65,7 +76,12 @@
           <label for="qType">Question Type</label>
           <select id="qType" onchange="toggleQuestionType()">
             <option value="mcq">Multiple Choice</option>
+            <option value="tf">True/False</option>
             <option value="open">Open-Ended</option>
+            <option value="fill_blank">Fill in the Blank</option>
+            <option value="code">Code Exercise</option>
+            <option value="math">Math Problem</option>
+            <option value="diagram_label">Diagram Labeling</option>
           </select>
         </div>
         <div class="form-group">
@@ -97,16 +113,124 @@
           </div>
         </div>
 
+        <!-- True/False fields -->
+        <div id="tfFields" style="display:none;">
+          <div class="form-group">
+            <label for="qTFAnswer">Correct Answer</label>
+            <select id="qTFAnswer">
+              <option value="true">True</option>
+              <option value="false">False</option>
+            </select>
+          </div>
+        </div>
+
         <!-- Open-ended fields -->
         <div id="openFields" style="display:none;">
           <div class="form-group">
             <label for="qExpected">Expected Answer / Key Points</label>
-            <textarea id="qExpected" rows="3" placeholder="The ideal answer or key points the student should cover..."></textarea>
+            <textarea id="qExpected" rows="3" placeholder="The ideal answer or key points..."></textarea>
           </div>
           <div class="form-group">
             <label for="qRubric">Grading Rubric</label>
-            <textarea id="qRubric" rows="3" placeholder="How should this answer be evaluated? What criteria matter?"></textarea>
+            <textarea id="qRubric" rows="3" placeholder="How should this answer be evaluated?"></textarea>
           </div>
+        </div>
+
+        <!-- Fill-in-the-blank fields -->
+        <div id="fillBlankFields" style="display:none;">
+          <div class="form-group">
+            <label for="qFillTemplate">Template (use _____ for blanks)</label>
+            <textarea id="qFillTemplate" rows="2" placeholder="The _____ protocol operates at layer _____ of the OSI model."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="qFillAnswers">Accepted Answers (comma-separated)</label>
+            <input type="text" id="qFillAnswers" placeholder="TCP, tcp, Transmission Control Protocol">
+          </div>
+        </div>
+
+        <!-- Code exercise fields -->
+        <div id="codeFields" style="display:none;">
+          <div class="form-group">
+            <label for="qCodeLang">Programming Language</label>
+            <select id="qCodeLang">
+              <option value="python">Python</option>
+              <option value="javascript">JavaScript</option>
+              <option value="java">Java</option>
+              <option value="c">C</option>
+              <option value="cpp">C++</option>
+              <option value="sql">SQL</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="qCodeTemplate">Starter Code Template</label>
+            <textarea id="qCodeTemplate" rows="5" class="code-textarea" placeholder="def solution():&#10;    # Write your code here&#10;    pass" spellcheck="false"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="qCodeSolution">Reference Solution</label>
+            <textarea id="qCodeSolution" rows="5" class="code-textarea" placeholder="def solution():&#10;    return 42" spellcheck="false"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="qTestCases">Test Cases (JSON array)</label>
+            <textarea id="qTestCases" rows="3" class="code-textarea" placeholder='[{"input": "5", "expected_output": "25"}]' spellcheck="false"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="qCodeExpected">Expected Answer Description</label>
+            <textarea id="qCodeExpected" rows="2" placeholder="The function should return the square of the input..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="qCodeRubric">Grading Rubric</label>
+            <textarea id="qCodeRubric" rows="2" placeholder="Evaluate correctness, edge cases, code quality..."></textarea>
+          </div>
+        </div>
+
+        <!-- Math fields -->
+        <div id="mathFields" style="display:none;">
+          <div class="form-group">
+            <label for="qMathLatex">LaTeX Expression (optional)</label>
+            <input type="text" id="qMathLatex" placeholder="\\int_{0}^{1} x^2 dx">
+          </div>
+          <div class="form-group">
+            <label for="qMathExpected">Expected Answer</label>
+            <textarea id="qMathExpected" rows="3" placeholder="The answer is 1/3. Steps: ..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="qMathRubric">Grading Rubric</label>
+            <textarea id="qMathRubric" rows="2" placeholder="Award partial credit for correct methodology..."></textarea>
+          </div>
+        </div>
+
+        <!-- Diagram labeling fields -->
+        <div id="diagramFields" style="display:none;">
+          <div class="form-group">
+            <label for="qDiagramMermaid">Mermaid Diagram Code</label>
+            <textarea id="qDiagramMermaid" rows="5" class="code-textarea" placeholder="graph TD&#10;    A[Client] --> B[Server]&#10;    B --> C[Database]" spellcheck="false"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="qLabelRegions">Label Regions (JSON array)</label>
+            <textarea id="qLabelRegions" rows="3" class="code-textarea" placeholder='[{"label": "Client", "hint": "The user-facing component"}]' spellcheck="false"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="qDiagramExpected">Expected Labels Description</label>
+            <textarea id="qDiagramExpected" rows="2" placeholder="Students should identify: Client, Server, Database..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="qDiagramRubric">Grading Rubric</label>
+            <textarea id="qDiagramRubric" rows="2" placeholder="Award points for each correctly identified component..."></textarea>
+          </div>
+        </div>
+
+        <!-- Shared metadata fields -->
+        <div class="form-group">
+          <label for="qDifficulty">Difficulty</label>
+          <select id="qDifficulty">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="qTopicTags">Topic Tags (comma-separated)</label>
+          <input type="text" id="qTopicTags" placeholder="networking, TCP/IP, protocols">
         </div>
 
         <div class="form-actions">
@@ -125,6 +249,7 @@
     </section>
   </div>
 
+  <script src="/js/components/question-renderers.js"></script>
   <script src="/js/admin.js"></script>
 </body>
 </html>

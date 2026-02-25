@@ -7,36 +7,64 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <div class="container landing">
-    <h1>Assessment Tool</h1>
-    <p class="subtitle">Create, share, and evaluate assessments with AI-powered grading</p>
+  <nav class="navbar">
+    <span class="nav-brand">Assessment Tool</span>
+    <div class="nav-links">
+      <a href="/content" style="color:rgba(255,255,255,0.85);">Content & AI</a>
+      <a href="/admin" class="btn btn-ghost btn-sm" style="color:white;border-color:rgba(255,255,255,0.4);">Admin Panel</a>
+    </div>
+  </nav>
 
-    <div class="card-group">
-      <div class="card">
-        <h2>For Teachers</h2>
-        <p>Create assessments, add multiple choice and open-ended questions, and view student results with AI-powered evaluation.</p>
-        <a href="/admin" class="btn btn-primary">Go to Admin Panel</a>
-      </div>
+  <div class="container">
+    <div class="landing">
+      <h1>Assessment Tool</h1>
+      <p class="subtitle">Select your course below to begin your assessment</p>
+    </div>
 
-      <div class="card">
-        <h2>For Students</h2>
-        <p>Enter the assessment code provided by your teacher to start your assessment.</p>
-        <form id="joinForm" class="inline-form">
-          <input type="text" id="shareCode" placeholder="Enter assessment code" required maxlength="8">
-          <button type="submit" class="btn btn-secondary">Start Assessment</button>
-        </form>
-      </div>
+    <div id="courseList" class="assessment-grid">
+      <p class="empty-state">Loading available assessments...</p>
     </div>
   </div>
 
   <script>
-    document.getElementById('joinForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const code = document.getElementById('shareCode').value.trim();
-      if (code) {
-        window.location.href = '/take/' + encodeURIComponent(code);
+    async function loadCourses() {
+      try {
+        const res = await fetch('/api/assessments');
+        const courses = await res.json();
+
+        const grid = document.getElementById('courseList');
+
+        if (!courses.length) {
+          grid.innerHTML = '<p class="empty-state">No assessments available yet.</p>';
+          return;
+        }
+
+        grid.innerHTML = courses.map(c => `
+          <div class="card assessment-card" onclick="window.location.href='/take/${c.share_code}'">
+            <div class="card-header">
+              <h3>${escapeHtml(c.title)}</h3>
+            </div>
+            ${c.subject ? `<p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.5rem;">${escapeHtml(c.subject)}</p>` : ''}
+            <div class="card-meta">
+              <span>📝 ${c.questionCount} questions</span>
+              <span>👥 ${c.submissionCount} submission${c.submissionCount !== 1 ? 's' : ''}</span>
+            </div>
+            <button class="btn btn-secondary" style="margin-top:1rem;width:100%;">Start Assessment →</button>
+          </div>
+        `).join('');
+      } catch (err) {
+        document.getElementById('courseList').innerHTML =
+          '<p class="empty-state">Failed to load assessments. Please try again.</p>';
       }
-    });
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str || '';
+      return d.innerHTML;
+    }
+
+    loadCourses();
   </script>
 </body>
 </html>

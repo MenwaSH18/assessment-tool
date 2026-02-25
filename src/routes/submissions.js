@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { evaluateAnswer } from './evaluate.js';
+import { gradeQuestion } from '../lib/question-types.js';
 
 const app = new Hono();
 
@@ -19,13 +20,49 @@ app.get('/take/:code', async (c) => {
 
     // Only show visible questions to students
     const questions = allQuestions.filter(q => q.is_visible !== 0);
-    const sanitized = questions.map(q => ({
-      id: q.id,
-      type: q.type,
-      question_text: q.question_text,
-      options: q.options ? JSON.parse(q.options) : null,
-      points: q.points || 1,
-      order_num: q.order_num,
+
+    // Fetch metadata for specialized question types
+    const sanitized = await Promise.all(questions.map(async (q) => {
+      const base = {
+        id: q.id,
+        type: q.type,
+        question_text: q.question_text,
+        options: q.options ? JSON.parse(q.options) : null,
+        points: q.points || 1,
+        order_num: q.order_num,
+      };
+
+      // Add type-specific metadata (student-safe fields only)
+      if (['code', 'math', 'fill_blank', 'diagram_label'].includes(q.type)) {
+        const { results: metaRows } = await c.env.DB.prepare(
+          'SELECT * FROM question_metadata WHERE question_id = ?'
+        ).bind(q.id).all();
+
+        if (metaRows.length > 0) {
+          const meta = metaRows[0];
+          if (q.type === 'code') {
+            base.metadata = {
+              code_language: meta.code_language,
+              code_template: meta.code_template,
+            };
+          } else if (q.type === 'math') {
+            base.metadata = {
+              math_latex: meta.math_latex,
+            };
+          } else if (q.type === 'fill_blank') {
+            base.metadata = {
+              fill_blank_template: meta.fill_blank_template,
+            };
+          } else if (q.type === 'diagram_label') {
+            base.metadata = {
+              diagram_mermaid: meta.diagram_mermaid,
+              label_regions: meta.label_regions ? JSON.parse(meta.label_regions) : null,
+            };
+          }
+        }
+      }
+
+      return base;
     }));
 
     return c.json({
@@ -79,14 +116,31 @@ app.post('/:code/submit', async (c) => {
       let aiFeedback = '';
       let pointsEarned = 0;
 
-      if (question.type === 'mcq') {
-        const studentChoice = (ans.answer || '').toUpperCase().trim();
-        const correctChoice = (question.correct_answer || '').toUpperCase().trim();
-        isCorrect = studentChoice === correctChoice ? 1 : 0;
-        pointsEarned = isCorrect ? (question.points || 1) : 0;
-        aiFeedback = isCorrect ? 'Correct!' : `Incorrect. The correct answer is ${correctChoice}.`;
+      // Fetch metadata for specialized types
+      let metadata = null;
+      if (['code', 'math', 'fill_blank', 'diagram_label'].includes(question.type)) {
+        const { results: metaRows } = await c.env.DB.prepare(
+          'SELECT * FROM question_metadata WHERE question_id = ?'
+        ).bind(question.id).all();
+        if (metaRows.length > 0) {
+          metadata = metaRows[0];
+          for (const field of ['test_cases', 'fill_blank_answers', 'label_regions', 'topic_tags']) {
+            if (metadata[field] && typeof metadata[field] === 'string') {
+              try { metadata[field] = JSON.parse(metadata[field]); } catch { /* keep as string */ }
+            }
+          }
+        }
+      }
+
+      // Try deterministic grading first (mcq, tf, fill_blank exact match)
+      const deterministicResult = gradeQuestion(question, ans.answer, metadata);
+
+      if (deterministicResult.graded) {
+        pointsEarned = deterministicResult.points_earned;
+        isCorrect = deterministicResult.is_correct ? 1 : 0;
+        aiFeedback = deterministicResult.feedback;
       } else {
-        // Open-ended: call evaluate function directly
+        // AI evaluation for open, code, math, diagram_label, fill_blank (partial credit)
         const evalResult = await evaluateAnswer({
           question_text: question.question_text,
           student_answer: ans.answer || '',
@@ -94,6 +148,8 @@ app.post('/:code/submit', async (c) => {
           rubric: question.rubric || '',
           points: question.points || 1,
           apiKey: c.env.ANTHROPIC_API_KEY,
+          type: question.type,
+          metadata,
         });
         pointsEarned = evalResult.points_earned || 0;
         isCorrect = evalResult.is_correct ? 1 : 0;

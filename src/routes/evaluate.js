@@ -1,10 +1,14 @@
 import { Hono } from 'hono';
 import Anthropic from '@anthropic-ai/sdk';
+import { getEvaluationSystemPrompt, getEvaluationUserPrompt } from '../lib/prompts/assessment-prompts.js';
 
 const app = new Hono();
 
-// Shared evaluate function (used by both endpoint and submissions route)
-export async function evaluateAnswer({ question_text, student_answer, correct_answer, rubric, points, apiKey }) {
+/**
+ * Evaluate a student's answer using Claude AI.
+ * Supports all question types: open, code, math, diagram_label, fill_blank.
+ */
+export async function evaluateAnswer({ question_text, student_answer, correct_answer, rubric, points, apiKey, type = 'open', metadata = null }) {
   if (!apiKey || apiKey === 'your_api_key_here') {
     return {
       points_earned: 0,
@@ -26,26 +30,16 @@ export async function evaluateAnswer({ question_text, student_answer, correct_an
   try {
     const client = new Anthropic({ apiKey });
 
-    const systemPrompt = `You are an educational assessment evaluator. Your task is to evaluate a student's answer to a question. Be fair, constructive, and educational in your feedback.
-
-You must respond with ONLY a valid JSON object (no markdown, no extra text) in this exact format:
-{
-  "points_earned": <number between 0 and ${maxPoints}>,
-  "is_correct": <true or false>,
-  "feedback": "<constructive feedback explaining what was good and what could be improved>"
-}`;
-
-    const userPrompt = `Question: ${question_text}
-
-Expected Answer / Key Points: ${correct_answer || 'Not provided'}
-
-Grading Rubric: ${rubric || 'Evaluate based on accuracy, completeness, and understanding.'}
-
-Student's Answer: ${student_answer}
-
-Maximum Points: ${maxPoints}
-
-Evaluate this answer and provide your assessment as JSON.`;
+    const systemPrompt = getEvaluationSystemPrompt(type, maxPoints);
+    const userPrompt = getEvaluationUserPrompt({
+      type,
+      question_text,
+      student_answer,
+      correct_answer,
+      rubric,
+      points: maxPoints,
+      metadata,
+    });
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -59,7 +53,7 @@ Evaluate this answer and provide your assessment as JSON.`;
     let evaluation;
     try {
       evaluation = JSON.parse(responseText);
-    } catch (parseErr) {
+    } catch {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         evaluation = JSON.parse(jsonMatch[0]);
@@ -86,15 +80,79 @@ Evaluate this answer and provide your assessment as JSON.`;
 
 // POST /api/evaluate
 app.post('/', async (c) => {
-  const { question_text, student_answer, correct_answer, rubric, points } = await c.req.json();
+  const { question_text, student_answer, correct_answer, rubric, points, type, metadata } = await c.req.json();
 
   if (!question_text || !student_answer) {
     return c.json({ error: 'question_text and student_answer are required' }, 400);
   }
 
   const apiKey = c.env.ANTHROPIC_API_KEY;
-  const result = await evaluateAnswer({ question_text, student_answer, correct_answer, rubric, points, apiKey });
+  const result = await evaluateAnswer({
+    question_text, student_answer, correct_answer, rubric, points,
+    apiKey, type: type || 'open', metadata: metadata || null,
+  });
   return c.json(result);
+});
+
+// POST /api/evaluate/batch-feedback - Full assessment feedback summary
+app.post('/batch-feedback', async (c) => {
+  try {
+    const { submission_id } = await c.req.json();
+    if (!submission_id) return c.json({ error: 'submission_id is required' }, 400);
+
+    const apiKey = c.env.ANTHROPIC_API_KEY;
+    if (!apiKey || apiKey === 'your_api_key_here') {
+      return c.json({ summary: 'AI feedback not configured.', strengths: [], weaknesses: [], recommendations: [] });
+    }
+
+    const { results: subs } = await c.env.DB.prepare('SELECT * FROM submissions WHERE id = ?').bind(submission_id).all();
+    if (subs.length === 0) return c.json({ error: 'Submission not found' }, 404);
+    const submission = subs[0];
+
+    const { results: answers } = await c.env.DB.prepare(
+      `SELECT a.*, q.question_text, q.type, q.correct_answer, q.points
+       FROM answers a JOIN questions q ON a.question_id = q.id
+       WHERE a.submission_id = ? ORDER BY q.order_num ASC`
+    ).bind(submission_id).all();
+
+    const client = new Anthropic({ apiKey });
+    const pct = submission.total > 0 ? Math.round((submission.score / submission.total) * 100) : 0;
+
+    const answerSummary = answers.map((a, i) =>
+      `Q${i + 1} (${a.type}): ${a.points_earned}/${a.points} pts - ${a.is_correct ? 'Correct' : 'Incorrect'}`
+    ).join('\n');
+
+    const message = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024,
+      system: `You are an educational advisor. Analyze a student's assessment performance and provide actionable feedback. Respond with ONLY valid JSON.`,
+      messages: [{
+        role: 'user',
+        content: `Student scored ${submission.score}/${submission.total} (${pct}%).
+
+Results breakdown:
+${answerSummary}
+
+Provide a JSON response:
+{
+  "summary": "<2-3 sentence overall assessment>",
+  "strengths": ["<strength 1>", "<strength 2>"],
+  "weaknesses": ["<area for improvement 1>", "<area for improvement 2>"],
+  "recommendations": ["<specific study recommendation 1>", "<recommendation 2>"]
+}`,
+      }],
+    });
+
+    const text = message.content[0].text.trim();
+    try {
+      return c.json(JSON.parse(text));
+    } catch {
+      const match = text.match(/\{[\s\S]*\}/);
+      return c.json(match ? JSON.parse(match[0]) : { summary: text, strengths: [], weaknesses: [], recommendations: [] });
+    }
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
 });
 
 export default app;

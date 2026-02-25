@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Content Management - Assessment Tool</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="nav-brand">Assessment Tool</a>
+    <div class="nav-links">
+      <a href="/admin">Admin Panel</a>
+      <span class="nav-label">Content Management</span>
+    </div>
+  </nav>
+
+  <div class="container">
+    <!-- Upload Section -->
+    <section class="card">
+      <h2>Upload Content</h2>
+      <p class="subtitle">Upload textbooks, papers, or any learning material for AI-powered question generation.</p>
+
+      <!-- Upload tabs -->
+      <div class="upload-tabs">
+        <button class="upload-tab active" onclick="switchUploadTab('file')" id="tabFile">Upload File</button>
+        <button class="upload-tab" onclick="switchUploadTab('url')" id="tabURL">From URL</button>
+        <button class="upload-tab" onclick="switchUploadTab('text')" id="tabText">Paste Text</button>
+      </div>
+
+      <!-- File Upload -->
+      <div id="uploadFilePanel" class="upload-panel">
+        <div class="upload-dropzone" id="dropzone"
+             ondragover="event.preventDefault(); this.classList.add('dragover')"
+             ondragleave="this.classList.remove('dragover')"
+             ondrop="handleDrop(event)">
+          <div class="dropzone-icon">📄</div>
+          <p class="dropzone-text">Drag & drop a file here, or click to browse</p>
+          <p class="dropzone-hint">Supports PDF, DOCX, and TXT files (max 50MB)</p>
+          <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.txt" onchange="handleFileSelect(event)" hidden>
+        </div>
+        <div id="selectedFile" class="selected-file" style="display:none;">
+          <span id="selectedFileName"></span>
+          <button class="btn btn-ghost btn-sm" onclick="clearSelectedFile()">✕</button>
+        </div>
+        <div class="form-group">
+          <label for="fileTitle">Title (optional)</label>
+          <input type="text" id="fileTitle" placeholder="e.g., Chapter 5 - Data Structures">
+        </div>
+        <div class="form-group">
+          <label for="fileAssessment">Link to Assessment (optional)</label>
+          <select id="fileAssessment">
+            <option value="">None - standalone resource</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="uploadFile()" id="uploadFileBtn">Upload & Process</button>
+      </div>
+
+      <!-- URL Input -->
+      <div id="uploadURLPanel" class="upload-panel" style="display:none;">
+        <div class="form-group">
+          <label for="urlInput">Web URL</label>
+          <input type="url" id="urlInput" placeholder="https://example.com/article-or-textbook">
+        </div>
+        <div class="form-group">
+          <label for="urlTitle">Title (optional)</label>
+          <input type="text" id="urlTitle" placeholder="e.g., Web Scraping Tutorial">
+        </div>
+        <div class="form-group">
+          <label for="urlAssessment">Link to Assessment (optional)</label>
+          <select id="urlAssessment">
+            <option value="">None - standalone resource</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="submitURL()">Process URL</button>
+      </div>
+
+      <!-- Text Input -->
+      <div id="uploadTextPanel" class="upload-panel" style="display:none;">
+        <div class="form-group">
+          <label for="textInput">Paste Content</label>
+          <textarea id="textInput" rows="8" placeholder="Paste textbook content, lecture notes, or any learning material here..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="textTitle">Title (optional)</label>
+          <input type="text" id="textTitle" placeholder="e.g., Lecture 3 Notes">
+        </div>
+        <div class="form-group">
+          <label for="textAssessment">Link to Assessment (optional)</label>
+          <select id="textAssessment">
+            <option value="">None - standalone resource</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="submitText()">Process Text</button>
+      </div>
+    </section>
+
+    <!-- Resources List -->
+    <section>
+      <div class="section-header">
+        <h2>Your Resources</h2>
+        <button class="btn btn-ghost" onclick="loadResources()">↻ Refresh</button>
+      </div>
+      <div id="resourceList" class="resource-list">
+        <p class="empty-state">Loading resources...</p>
+      </div>
+    </section>
+
+    <!-- Search Section -->
+    <section class="card" style="margin-top: 2rem;">
+      <h2>Semantic Search</h2>
+      <p class="subtitle">Search across all your uploaded content using natural language.</p>
+      <div class="search-row">
+        <input type="text" id="searchQuery" placeholder="e.g., What is a binary search tree?" class="search-input">
+        <button class="btn btn-primary" onclick="performSearch()">Search</button>
+      </div>
+      <div class="form-group" style="margin-top: 0.5rem;">
+        <label>
+          <input type="number" id="searchTopK" value="5" min="1" max="20" style="width: 60px;">
+          results
+        </label>
+      </div>
+      <div id="searchResults" style="display:none;">
+        <h3>Search Results</h3>
+        <div id="searchResultsList"></div>
+      </div>
+    </section>
+
+    <!-- AI Question Generation -->
+    <section class="card" style="margin-top: 2rem;">
+      <h2>AI Question Generation</h2>
+      <p class="subtitle">Generate assessment questions from your uploaded content.</p>
+
+      <div class="form-group">
+        <label for="genResource">Source Resource</label>
+        <select id="genResource">
+          <option value="">Select a resource...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="genTopic">Focus Topic (optional)</label>
+        <input type="text" id="genTopic" placeholder="e.g., Binary Trees, Sorting Algorithms">
+      </div>
+      <div class="form-group">
+        <label>Question Types</label>
+        <div class="checkbox-group">
+          <label><input type="checkbox" value="mcq" checked> Multiple Choice</label>
+          <label><input type="checkbox" value="tf"> True/False</label>
+          <label><input type="checkbox" value="open" checked> Open-Ended</label>
+          <label><input type="checkbox" value="fill_blank"> Fill in Blank</label>
+          <label><input type="checkbox" value="code"> Code Exercise</label>
+          <label><input type="checkbox" value="math"> Math Problem</label>
+          <label><input type="checkbox" value="diagram_label"> Diagram Labeling</label>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="genCount">Number of Questions</label>
+          <input type="number" id="genCount" value="5" min="1" max="20">
+        </div>
+        <div class="form-group">
+          <label for="genDifficulty">Difficulty</label>
+          <select id="genDifficulty">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="genAssessment">Add to Assessment (optional)</label>
+          <select id="genAssessment">
+            <option value="">Preview only</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="generateQuestions()" id="generateBtn">🤖 Generate Questions</button>
+
+      <div id="generatedPreview" style="display:none; margin-top: 1.5rem;">
+        <h3>Generated Questions Preview</h3>
+        <div id="generatedList"></div>
+        <div class="form-actions" id="generatedActions" style="display:none;">
+          <button class="btn btn-primary" onclick="saveGeneratedToAssessment()">Save All to Assessment</button>
+          <button class="btn btn-ghost" onclick="clearGenerated()">Discard</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Worked Examples -->
+    <section class="card" style="margin-top: 2rem;">
+      <h2>Worked Examples & Practice</h2>
+      <p class="subtitle">AI-generated step-by-step examples and practice problem sets.</p>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="exResource">Source Resource (optional)</label>
+          <select id="exResource">
+            <option value="">None</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="exTopic">Topic *</label>
+          <input type="text" id="exTopic" placeholder="e.g., Dijkstra's Algorithm">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="generateWorkedExample()">📝 Worked Example</button>
+        <button class="btn btn-primary" onclick="generatePracticeProblems()">📋 Practice Problems</button>
+      </div>
+
+      <div id="workedExampleResult" style="display:none; margin-top: 1.5rem;"></div>
+      <div id="practiceProblemsResult" style="display:none; margin-top: 1.5rem;"></div>
+    </section>
+  </div>
+
+  <!-- Loading overlay -->
+  <div id="loadingOverlay" class="loading-overlay" style="display:none;">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <p id="loadingText">Processing...</p>
+    </div>
+  </div>
+
+  <script src="/js/content.js"></script>
+</body>
+</html>

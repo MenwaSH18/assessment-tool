@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Take Assessment</title>
   <link rel="stylesheet" href="/css/style.css">
+  <!-- KaTeX for math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <!-- Mermaid for diagrams -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 </head>
 <body>
   <nav class="navbar">
@@ -16,7 +21,6 @@
     <!-- Student Name Entry -->
     <section id="nameEntry" class="card centered-card">
       <h2 id="assessmentHeading">Assessment</h2>
-      <p id="assessmentDesc"></p>
       <p id="assessmentMeta" style="font-size:0.85rem;color:var(--text-light);margin-bottom:1rem;"></p>
       <div class="form-group">
         <label for="studentName">Your Name *</label>
@@ -27,6 +31,16 @@
 
     <!-- Questions Section -->
     <section id="questionsSection" style="display:none;">
+
+      <!-- Assessment info banner -->
+      <div class="assessment-banner" id="assessmentBanner">
+        <div class="assessment-banner-main">
+          <span class="assessment-banner-title" id="bannerTitle"></span>
+          <span class="assessment-banner-meta" id="bannerMeta"></span>
+        </div>
+        <p class="assessment-banner-desc" id="bannerDesc"></p>
+      </div>
+
       <div class="progress-bar-container">
         <div class="progress-bar" id="progressBar"></div>
       </div>
@@ -45,10 +59,13 @@
     <div id="loadingOverlay" class="loading-overlay" style="display:none;">
       <div class="spinner"></div>
       <p style="font-weight:600;font-size:1.1rem;">Evaluating your answers...</p>
-      <p class="loading-sub">AI is reviewing your open-ended responses. This may take a moment.</p>
+      <p class="loading-sub">AI is reviewing your responses. This may take a moment.</p>
     </div>
   </div>
 
+  <script src="/js/components/question-renderers.js"></script>
+  <script src="/js/lib/katex-render.js"></script>
+  <script src="/js/lib/mermaid-render.js"></script>
   <script src="/js/assessment.js"></script>
 </body>
 </html>
