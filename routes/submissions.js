@@ -11,14 +11,35 @@ router.get('/take/:code', (req, res) => {
     const allQuestions = db.questions.getByAssessment.all(assessment.id);
     // Only show visible questions to students
     const questions = allQuestions.filter(q => q.is_visible !== 0);
-    const sanitized = questions.map(q => ({
-      id: q.id,
-      type: q.type,
-      question_text: q.question_text,
-      options: q.options ? JSON.parse(q.options) : null,
-      points: q.points || 1,
-      order_num: q.order_num,
-    }));
+    const sanitized = questions.map(q => {
+      const base = {
+        id: q.id,
+        type: q.type,
+        question_text: q.question_text,
+        options: q.options ? JSON.parse(q.options) : null,
+        points: q.points || 1,
+        order_num: q.order_num,
+      };
+      // Include student-facing metadata (no solutions/answers)
+      const meta = db.metadata.getByQuestion.get(q.id);
+      if (meta) {
+        if (q.type === 'code') {
+          base.code_language = meta.code_language;
+          base.code_template = meta.code_template;
+        }
+        if (q.type === 'fill_blank') {
+          base.fill_blank_template = meta.fill_blank_template;
+        }
+        if (q.type === 'diagram_label') {
+          base.diagram_mermaid = meta.diagram_mermaid;
+          base.label_regions = meta.label_regions ? JSON.parse(meta.label_regions) : null;
+        }
+        if (q.type === 'math') {
+          base.math_latex = meta.math_latex;
+        }
+      }
+      return base;
+    });
 
     res.json({
       id: assessment.id,
@@ -81,10 +102,59 @@ router.post('/:code/submit', async (req, res) => {
         isCorrect = studentChoice === correctChoice ? 1 : 0;
         pointsEarned = isCorrect ? (question.points || 1) : 0;
         aiFeedback = isCorrect
-          ? 'Correct!'
-          : `Incorrect. The correct answer is ${correctChoice}.`;
+          ? 'Well done! Correct answer.'
+          : `The correct answer is ${correctChoice}. Review this concept and try again.`;
+      } else if (question.type === 'tf') {
+        const studentChoice = (ans.answer || '').toLowerCase().trim();
+        const correctChoice = (question.correct_answer || '').toLowerCase().trim();
+        isCorrect = studentChoice === correctChoice ? 1 : 0;
+        pointsEarned = isCorrect ? (question.points || 1) : 0;
+        aiFeedback = isCorrect
+          ? 'Well done! Correct answer.'
+          : `The correct answer is ${question.correct_answer}. Review this concept and try again.`;
+      } else if (question.type === 'fill_blank') {
+        // Compare each blank individually for partial credit
+        const meta = db.metadata.getByQuestion.get(question.id);
+        let expectedAnswers = [];
+        if (meta && meta.fill_blank_answers) {
+          try { expectedAnswers = JSON.parse(meta.fill_blank_answers); } catch (e) { /* ignore */ }
+        }
+        if (expectedAnswers.length === 0 && question.correct_answer) {
+          expectedAnswers = [question.correct_answer];
+        }
+
+        // Student answers are pipe-separated: "word1 | word2 | word3"
+        const studentParts = (ans.answer || '').split('|').map(s => s.trim());
+        const totalBlanks = expectedAnswers.length;
+        let correctCount = 0;
+        const blankResults = [];
+
+        for (let i = 0; i < totalBlanks; i++) {
+          const expected = (expectedAnswers[i] || '').trim().toLowerCase();
+          const student = (studentParts[i] || '').trim().toLowerCase();
+          const match = student === expected;
+          if (match) correctCount++;
+          blankResults.push({ blank: i + 1, correct: match, expected: expectedAnswers[i] || '' });
+        }
+
+        const maxPts = question.points || 1;
+        if (correctCount === totalBlanks) {
+          isCorrect = 1;
+          pointsEarned = maxPts;
+          aiFeedback = 'Well done! All answers are correct.';
+        } else if (correctCount > 0) {
+          isCorrect = 0;
+          pointsEarned = Math.round((correctCount / totalBlanks) * maxPts * 100) / 100;
+          const wrong = blankResults.filter(b => !b.correct)
+            .map(b => `Blank ${b.blank}: the correct answer is "${b.expected}"`).join('; ');
+          aiFeedback = `You got ${correctCount} out of ${totalBlanks} correct. Review the following: ${wrong}.`;
+        } else {
+          isCorrect = 0;
+          pointsEarned = 0;
+          aiFeedback = `Review this topic and try again. The correct answers are: ${expectedAnswers.join(', ')}.`;
+        }
       } else {
-        // Open-ended: call AI evaluation
+        // open, code, math, diagram_label: call AI evaluation
         try {
           const evalResponse = await fetch(`http://localhost:${process.env.PORT || 3000}/api/evaluate`, {
             method: 'POST',

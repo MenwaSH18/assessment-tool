@@ -21,7 +21,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS questions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     assessment_id INTEGER NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('mcq', 'open')),
+    type TEXT NOT NULL CHECK(type IN ('mcq', 'open', 'tf', 'fill_blank', 'diagram_label', 'code', 'math')),
     question_text TEXT NOT NULL,
     options TEXT DEFAULT NULL,
     correct_answer TEXT DEFAULT NULL,
@@ -53,10 +53,29 @@ db.exec(`
     FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS question_metadata (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id INTEGER NOT NULL UNIQUE,
+    diagram_mermaid TEXT DEFAULT NULL,
+    code_language TEXT DEFAULT NULL,
+    code_template TEXT DEFAULT NULL,
+    code_solution TEXT DEFAULT NULL,
+    test_cases TEXT DEFAULT NULL,
+    math_latex TEXT DEFAULT NULL,
+    fill_blank_template TEXT DEFAULT NULL,
+    fill_blank_answers TEXT DEFAULT NULL,
+    label_regions TEXT DEFAULT NULL,
+    difficulty TEXT DEFAULT 'medium' CHECK(difficulty IN ('easy', 'medium', 'hard')),
+    topic_tags TEXT DEFAULT '[]',
+    bloom_level TEXT DEFAULT NULL,
+    FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+  );
+
   CREATE INDEX IF NOT EXISTS idx_questions_assessment ON questions(assessment_id);
   CREATE INDEX IF NOT EXISTS idx_submissions_assessment ON submissions(assessment_id);
   CREATE INDEX IF NOT EXISTS idx_answers_submission ON answers(submission_id);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_share_code ON assessments(share_code);
+  CREATE INDEX IF NOT EXISTS idx_metadata_question ON question_metadata(question_id);
 `);
 
 // Migration: Add is_visible column if it doesn't exist
@@ -119,6 +138,21 @@ const updateQuestionOrder = db.prepare(
   `UPDATE questions SET order_num = ? WHERE id = ?`
 );
 
+// Question Metadata
+const insertMetadata = db.prepare(
+  `INSERT INTO question_metadata (question_id, diagram_mermaid, code_language, code_template, code_solution, test_cases, math_latex, fill_blank_template, fill_blank_answers, label_regions, difficulty, topic_tags, bloom_level)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+);
+const getMetadataByQuestion = db.prepare(
+  `SELECT * FROM question_metadata WHERE question_id = ?`
+);
+const updateMetadata = db.prepare(
+  `UPDATE question_metadata SET diagram_mermaid = ?, code_language = ?, code_template = ?, code_solution = ?, test_cases = ?, math_latex = ?, fill_blank_template = ?, fill_blank_answers = ?, label_regions = ?, difficulty = ?, topic_tags = ?, bloom_level = ? WHERE question_id = ?`
+);
+const deleteMetadata = db.prepare(
+  `DELETE FROM question_metadata WHERE question_id = ?`
+);
+
 // Submissions
 const insertSubmission = db.prepare(
   `INSERT INTO submissions (assessment_id, student_name, score, total) VALUES (?, ?, ?, ?)`
@@ -164,6 +198,12 @@ module.exports = {
     toggleVisibility: toggleQuestionVisibility,
     getAdjacent: getAdjacentQuestion,
     updateOrder: updateQuestionOrder,
+  },
+  metadata: {
+    insert: insertMetadata,
+    getByQuestion: getMetadataByQuestion,
+    update: updateMetadata,
+    delete: deleteMetadata,
   },
   submissions: {
     insert: insertSubmission,
