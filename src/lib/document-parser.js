@@ -13,9 +13,18 @@
  */
 export async function parseDocument(ai, r2Object, type) {
   if (!r2Object) throw new Error('R2 object not found');
+  if (!ai || typeof ai.toMarkdown !== 'function') {
+    throw new Error('Workers AI binding is required for parsing PDF/DOCX files');
+  }
 
   const arrayBuffer = await r2Object.arrayBuffer();
-  const blob = new Blob([arrayBuffer]);
+  const mimeTypes = {
+    pdf: 'application/pdf',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    doc: 'application/msword',
+  };
+  const mimeType = mimeTypes[type] || 'application/octet-stream';
+  const blob = new Blob([arrayBuffer], { type: mimeType });
 
   try {
     const result = await ai.toMarkdown([blob]);

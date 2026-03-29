@@ -21,18 +21,25 @@ app.post('/upload', async (c) => {
     else if (fileName.endsWith('.txt')) type = 'text';
     else return c.json({ error: 'Unsupported file type. Supported: PDF, DOCX, TXT' }, 400);
 
-    // Upload to R2
-    const r2Key = `resources/${Date.now()}_${file.name}`;
-    if (c.env.R2) {
-      await c.env.R2.put(r2Key, await file.arrayBuffer(), {
-        httpMetadata: { contentType: file.type },
-      });
+    // For text files, read content directly; for PDF/DOCX, store in R2
+    let r2Key = null;
+    let rawText = null;
+
+    if (type === 'text') {
+      rawText = await file.text();
+    } else {
+      r2Key = `resources/${Date.now()}_${file.name}`;
+      if (c.env.R2) {
+        await c.env.R2.put(r2Key, await file.arrayBuffer(), {
+          httpMetadata: { contentType: file.type },
+        });
+      }
     }
 
     // Create resource record
     const result = await c.env.DB.prepare(
-      'INSERT INTO resources (title, type, r2_key, assessment_id, status) VALUES (?, ?, ?, ?, ?)'
-    ).bind(title, type, r2Key, assessmentId, 'pending').run();
+      'INSERT INTO resources (title, type, r2_key, raw_text, assessment_id, status) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(title, type, r2Key, rawText, assessmentId, 'pending').run();
     const resourceId = result.meta.last_row_id;
 
     // Process asynchronously if Queue is available, otherwise process inline
