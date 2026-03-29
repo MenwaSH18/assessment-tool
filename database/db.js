@@ -76,6 +76,32 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_answers_submission ON answers(submission_id);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_share_code ON assessments(share_code);
   CREATE INDEX IF NOT EXISTS idx_metadata_question ON question_metadata(question_id);
+
+  CREATE TABLE IF NOT EXISTS resources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('pdf', 'docx', 'text', 'url')),
+    raw_text TEXT DEFAULT NULL,
+    source_url TEXT DEFAULT NULL,
+    file_path TEXT DEFAULT NULL,
+    assessment_id INTEGER DEFAULT NULL,
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'processing', 'ready', 'error')),
+    error_message TEXT DEFAULT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS content_chunks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    resource_id INTEGER NOT NULL,
+    chunk_index INTEGER NOT NULL,
+    chunk_text TEXT NOT NULL,
+    token_count INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_chunks_resource ON content_chunks(resource_id);
 `);
 
 // Migration: Add is_visible column if it doesn't exist
@@ -166,6 +192,15 @@ const getSubmissionById = db.prepare(
 const updateSubmissionScore = db.prepare(
   `UPDATE submissions SET score = ?, total = ? WHERE id = ?`
 );
+const updateSubmissionName = db.prepare(
+  `UPDATE submissions SET student_name = ? WHERE id = ?`
+);
+const deleteSubmission = db.prepare(
+  `DELETE FROM submissions WHERE id = ?`
+);
+const deleteSubmissionsByAssessment = db.prepare(
+  `DELETE FROM submissions WHERE assessment_id = ?`
+);
 
 // Answers
 const insertAnswer = db.prepare(
@@ -176,6 +211,39 @@ const getAnswersBySubmission = db.prepare(
   `SELECT a.*, q.question_text, q.type, q.correct_answer, q.options, q.points, q.rubric
    FROM answers a JOIN questions q ON a.question_id = q.id
    WHERE a.submission_id = ? ORDER BY q.order_num ASC`
+);
+
+// Resources
+const insertResource = db.prepare(
+  `INSERT INTO resources (title, type, raw_text, source_url, file_path, assessment_id, status) VALUES (?, ?, ?, ?, ?, ?, ?)`
+);
+const getAllResources = db.prepare(
+  `SELECT r.*, COUNT(cc.id) as chunk_count
+   FROM resources r LEFT JOIN content_chunks cc ON r.id = cc.resource_id
+   GROUP BY r.id ORDER BY r.created_at DESC`
+);
+const getResourceById = db.prepare(
+  `SELECT * FROM resources WHERE id = ?`
+);
+const updateResourceStatus = db.prepare(
+  `UPDATE resources SET status = ?, error_message = ? WHERE id = ?`
+);
+const updateResourceText = db.prepare(
+  `UPDATE resources SET raw_text = ? WHERE id = ?`
+);
+const deleteResource = db.prepare(
+  `DELETE FROM resources WHERE id = ?`
+);
+
+// Content Chunks
+const insertChunk = db.prepare(
+  `INSERT INTO content_chunks (resource_id, chunk_index, chunk_text, token_count) VALUES (?, ?, ?, ?)`
+);
+const getChunksByResource = db.prepare(
+  `SELECT id, chunk_index, token_count FROM content_chunks WHERE resource_id = ? ORDER BY chunk_index`
+);
+const deleteChunksByResource = db.prepare(
+  `DELETE FROM content_chunks WHERE resource_id = ?`
 );
 
 module.exports = {
@@ -210,9 +278,25 @@ module.exports = {
     getByAssessment: getSubmissionsByAssessment,
     getById: getSubmissionById,
     updateScore: updateSubmissionScore,
+    updateName: updateSubmissionName,
+    delete: deleteSubmission,
+    deleteByAssessment: deleteSubmissionsByAssessment,
   },
   answers: {
     insert: insertAnswer,
     getBySubmission: getAnswersBySubmission,
+  },
+  resources: {
+    insert: insertResource,
+    getAll: getAllResources,
+    getById: getResourceById,
+    updateStatus: updateResourceStatus,
+    updateText: updateResourceText,
+    delete: deleteResource,
+  },
+  chunks: {
+    insert: insertChunk,
+    getByResource: getChunksByResource,
+    deleteByResource: deleteChunksByResource,
   },
 };

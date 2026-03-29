@@ -87,7 +87,9 @@ export function gradeQuestion(question, studentAnswer, metadata) {
         graded: true,
         points_earned: isCorrect ? maxPoints : 0,
         is_correct: isCorrect,
-        feedback: isCorrect ? 'Correct!' : `Incorrect. The correct answer is ${correct}.`,
+        feedback: isCorrect
+          ? 'Well done! Correct answer.'
+          : `The correct answer is ${correct}. Review this concept and try again.`,
       };
     }
 
@@ -98,31 +100,64 @@ export function gradeQuestion(question, studentAnswer, metadata) {
         graded: true,
         points_earned: isCorrect ? maxPoints : 0,
         is_correct: isCorrect,
-        feedback: isCorrect ? 'Correct!' : `Incorrect. The correct answer is ${correct === 'true' ? 'True' : 'False'}.`,
+        feedback: isCorrect
+          ? 'Well done! Correct answer.'
+          : `The correct answer is ${correct === 'true' ? 'True' : 'False'}. Review this concept and try again.`,
       };
     }
 
     case 'fill_blank': {
-      // Try deterministic match first
-      const acceptedAnswers = metadata?.fill_blank_answers
+      // Per-blank partial credit grading
+      let expectedAnswers = metadata?.fill_blank_answers
         ? (typeof metadata.fill_blank_answers === 'string' ? JSON.parse(metadata.fill_blank_answers) : metadata.fill_blank_answers)
         : null;
 
-      if (acceptedAnswers && acceptedAnswers.length > 0) {
-        const normalizedAnswer = answer.toLowerCase().trim();
-        const isCorrect = acceptedAnswers.some(a => a.toLowerCase().trim() === normalizedAnswer);
-        if (isCorrect) {
-          return {
-            graded: true,
-            points_earned: maxPoints,
-            is_correct: true,
-            feedback: 'Correct!',
-          };
+      if (!expectedAnswers || expectedAnswers.length === 0) {
+        if (question.correct_answer) {
+          expectedAnswers = [question.correct_answer];
+        } else {
+          return { graded: false };
         }
-        // If not an exact match, fall through to AI for partial credit
       }
-      // Fall through to AI evaluation
-      return { graded: false };
+
+      // Student answers are pipe-separated: "word1 | word2 | word3"
+      const studentParts = answer.split('|').map(s => s.trim());
+      const totalBlanks = expectedAnswers.length;
+      let correctCount = 0;
+      const blankResults = [];
+
+      for (let i = 0; i < totalBlanks; i++) {
+        const expected = (expectedAnswers[i] || '').trim().toLowerCase();
+        const student = (studentParts[i] || '').trim().toLowerCase();
+        const match = student === expected;
+        if (match) correctCount++;
+        blankResults.push({ blank: i + 1, correct: match, expected: expectedAnswers[i] || '' });
+      }
+
+      if (correctCount === totalBlanks) {
+        return {
+          graded: true,
+          points_earned: maxPoints,
+          is_correct: true,
+          feedback: 'Well done! All answers are correct.',
+        };
+      } else if (correctCount > 0) {
+        const wrong = blankResults.filter(b => !b.correct)
+          .map(b => `Blank ${b.blank}: the correct answer is "${b.expected}"`).join('; ');
+        return {
+          graded: true,
+          points_earned: Math.round((correctCount / totalBlanks) * maxPoints * 100) / 100,
+          is_correct: false,
+          feedback: `You got ${correctCount} out of ${totalBlanks} correct. Review the following: ${wrong}.`,
+        };
+      } else {
+        return {
+          graded: true,
+          points_earned: 0,
+          is_correct: false,
+          feedback: `Review this topic and try again. The correct answers are: ${expectedAnswers.join(', ')}.`,
+        };
+      }
     }
 
     // These types always require AI evaluation

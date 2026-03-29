@@ -7,6 +7,7 @@ const assessmentRoutes = require('./routes/assessments');
 const questionRoutes = require('./routes/questions');
 const submissionRoutes = require('./routes/submissions');
 const evaluateRoutes = require('./routes/evaluate');
+const contentRoutes = require('./routes/content');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,18 +22,23 @@ app.use('/api/assessments', assessmentRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/submissions', submissionRoutes);
 app.use('/api/evaluate', evaluateRoutes);
+app.use('/api/content', contentRoutes);
 
 // Page routes
 app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+  res.sendFile(path.resolve(__dirname, 'public', 'admin.html'));
 });
 
 app.get('/take/:code', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'assessment.html'));
+  res.sendFile(path.resolve(__dirname, 'public', 'assessment.html'));
 });
 
 app.get('/results/:submissionId', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'results.html'));
+  res.sendFile(path.resolve(__dirname, 'public', 'results.html'));
+});
+
+app.get('/content', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'content.html'));
 });
 
 // Global error handler

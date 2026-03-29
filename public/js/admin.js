@@ -528,19 +528,24 @@ async function loadSubmissions(assessmentId) {
             <th>Score</th>
             <th>Percentage</th>
             <th>Submitted</th>
-            <th></th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           ${subs.map(s => {
             const pct = s.total > 0 ? Math.round((s.score / s.total) * 100) : 0;
+            const safeName = escapeHtml(s.student_name).replace(/'/g, "\\'");
             return `
               <tr>
                 <td>${escapeHtml(s.student_name)}</td>
                 <td>${s.score} / ${s.total}</td>
                 <td>${pct}%</td>
                 <td>${new Date(s.submitted_at + 'Z').toLocaleString()}</td>
-                <td><a href="/results/${s.id}" target="_blank" class="btn btn-sm btn-ghost">View</a></td>
+                <td>
+                  <a href="/results/${s.id}" target="_blank" class="btn btn-sm btn-ghost">View</a>
+                  <button class="btn btn-sm btn-ghost" onclick="editStudentName(${s.id}, '${safeName}')">Edit</button>
+                  <button class="btn btn-sm btn-danger" onclick="deleteSubmission(${s.id})">Delete</button>
+                </td>
               </tr>
             `;
           }).join('')}
@@ -549,6 +554,50 @@ async function loadSubmissions(assessmentId) {
     `;
   } catch (err) {
     console.error('Failed to load submissions:', err);
+  }
+}
+
+async function editStudentName(submissionId, currentName) {
+  const newName = prompt('Edit student name:', currentName);
+  if (newName === null) return;
+  if (!newName.trim()) {
+    alert('Student name cannot be empty');
+    return;
+  }
+  try {
+    const res = await fetch(API + '/submissions/' + submissionId + '/name', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_name: newName.trim() }),
+    });
+    if (res.ok) {
+      loadSubmissions(currentAssessmentId);
+    } else {
+      const err = await res.json();
+      alert(err.error || 'Failed to update name');
+    }
+  } catch (err) {
+    alert('Network error: ' + err.message);
+  }
+}
+
+async function deleteSubmission(submissionId) {
+  if (!confirm('Delete this submission? This cannot be undone.')) return;
+  try {
+    await fetch(API + '/submissions/' + submissionId, { method: 'DELETE' });
+    loadSubmissions(currentAssessmentId);
+  } catch (err) {
+    alert('Failed to delete: ' + err.message);
+  }
+}
+
+async function clearAllSubmissions() {
+  if (!confirm('Clear ALL submissions for this assessment? This cannot be undone.')) return;
+  try {
+    await fetch(API + '/submissions/assessment/' + currentAssessmentId + '/all', { method: 'DELETE' });
+    loadSubmissions(currentAssessmentId);
+  } catch (err) {
+    alert('Failed to clear submissions: ' + err.message);
   }
 }
 

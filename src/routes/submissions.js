@@ -202,6 +202,58 @@ app.get('/assessment/:id', async (c) => {
   }
 });
 
+// DELETE /api/submissions/assessment/:id/all - Clear all submissions for an assessment (admin)
+app.delete('/assessment/:id/all', async (c) => {
+  try {
+    const assessmentId = c.req.param('id');
+    const { results: assessments } = await c.env.DB.prepare(
+      'SELECT * FROM assessments WHERE id = ?'
+    ).bind(assessmentId).all();
+    if (assessments.length === 0) return c.json({ error: 'Assessment not found' }, 404);
+
+    await c.env.DB.prepare('DELETE FROM submissions WHERE assessment_id = ?').bind(assessmentId).run();
+    return c.json({ message: 'All submissions cleared' });
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// PUT /api/submissions/:id/name - Update student name (admin)
+app.put('/:id/name', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const { student_name } = await c.req.json();
+
+    if (!student_name || !student_name.trim()) {
+      return c.json({ error: 'Student name is required' }, 400);
+    }
+
+    const { results: subs } = await c.env.DB.prepare('SELECT * FROM submissions WHERE id = ?').bind(id).all();
+    if (subs.length === 0) return c.json({ error: 'Submission not found' }, 404);
+
+    await c.env.DB.prepare('UPDATE submissions SET student_name = ? WHERE id = ?').bind(student_name.trim(), id).run();
+
+    const { results: updated } = await c.env.DB.prepare('SELECT * FROM submissions WHERE id = ?').bind(id).all();
+    return c.json(updated[0]);
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// DELETE /api/submissions/:id - Delete a single submission (admin)
+app.delete('/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const { results: subs } = await c.env.DB.prepare('SELECT * FROM submissions WHERE id = ?').bind(id).all();
+    if (subs.length === 0) return c.json({ error: 'Submission not found' }, 404);
+
+    await c.env.DB.prepare('DELETE FROM submissions WHERE id = ?').bind(id).run();
+    return c.json({ message: 'Submission deleted' });
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // GET /api/submissions/:id - Get single submission with answers
 app.get('/:id', async (c) => {
   try {

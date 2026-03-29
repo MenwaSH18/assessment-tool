@@ -229,6 +229,48 @@ router.get('/assessment/:id', (req, res) => {
   }
 });
 
+// DELETE /api/submissions/assessment/:id/all - Clear all submissions for an assessment (admin)
+router.delete('/assessment/:id/all', (req, res) => {
+  try {
+    const assessment = db.assessments.getById.get(req.params.id);
+    if (!assessment) return res.status(404).json({ error: 'Assessment not found' });
+    db.submissions.deleteByAssessment.run(req.params.id);
+    res.json({ message: 'All submissions cleared' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/submissions/:id/name - Update student name (admin)
+router.put('/:id/name', (req, res) => {
+  try {
+    const { student_name } = req.body;
+    if (!student_name || !student_name.trim()) {
+      return res.status(400).json({ error: 'Student name is required' });
+    }
+    const existing = db.submissions.getById.get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Submission not found' });
+
+    db.submissions.updateName.run(student_name.trim(), req.params.id);
+    const updated = db.submissions.getById.get(req.params.id);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/submissions/:id - Delete a single submission (admin)
+router.delete('/:id', (req, res) => {
+  try {
+    const existing = db.submissions.getById.get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Submission not found' });
+    db.submissions.delete.run(req.params.id);
+    res.json({ message: 'Submission deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/submissions/:id - Get a single submission with answers
 router.get('/:id', (req, res) => {
   try {
